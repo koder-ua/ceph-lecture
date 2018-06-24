@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Title</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code, .remark-inline-code { font-family: 'Ubuntu Mono'; }
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+Plan
+=========
+    * distributed storage
+    * ceph architecture
+    * hw recommendations
+    * tests
+    * tupical issues
+    * how to test
+
+---
+Distributed storage
+===================
+    * Data duplication
+    * Self-recovery on node failure
+    * CP vs AP - system behaviour in case of failure
+
+---
+Comparision
+===========
+    * local hdd
+    * cinder+lvm
+    * ceph
+    * glusterfs
+    * netapp & Co
+
+---
+Ceph
+====
+    * rados
+    * rbd
+    * cephfs
+    * radosgw (S3/Swift)
+
+---
+Mon
+===
+    * ceph-mon process, 2N+1
+    * responsible to store relatevelly small amount of meta-info about cluster
+        * osd status
+        * crush tree
+        * pools/PG status/settings
+        * auth keys
+        * etc
+    * all monitors are replicating this info using paxos
+    *
+
+---
+OSD
+===
+    * RPC server, responsible for 1 storage device (HDD/SSD)
+    * SSD/NVME drives can be partitioned on 2-4 parts and separated OSD
+      can be deployed on each partition
+    * Filestore:
+        * XFS filesystem, mounted to /var/lib/ceph/
+        * pools+pgs - directories
+        * objects - files
+        * file attributes & leveldb data - object attributes
+    *
+
+---
+RadosGW
+=======
+
+---
+MGR
+===
+
+---
+MDS
+===
+
+
+---
+Data location
+=============
+    * objects
+    * PG
+    * pools
+    * Crush
+
+---
+Object
+======
+    * string name
+    * one chunk of data
+    * attributes
+    * rados list ....
+
+---
+PG
+==
+    * Box for set of objects
+    * Fixed PG count (can be increased, but this is heavy-load operation)
+    * Track history and state
+
+---
+Pool
+====
+    * Set of PG's with the same settings
+    * Has name, location and replication settings
+
+
+---
+Crush
+=====
+    * Simple programming language for data distribution
+    * Large tree, which has osd's in leafs
+    * Failure domains as levels of tree
+    * For each PG tree traversed from top to find OSD's where this PG would be
+      located
+
+
+---
+auth
+====
+
+---
+configs
+=======
+
+---
+Network
+=======
+    * cluster/replication/recovery net (south-north)
+    * client net (east-west)
+
+---
+cli tools
+=========
+
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS_HTML&delayStartupUntil=configured" type="text/javascript"></script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+
+      // Setup MathJax
+      MathJax.Hub.Config({
+          tex2jax: {
+          skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+          }
+      });
+
+      MathJax.Hub.Configured();
+    </script>
+  </body>
+</html>
+in
