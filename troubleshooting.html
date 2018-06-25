@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Title</title>
+    <meta charset="utf-8">
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Yanone+Kaffeesatz);
+      @import url(https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic);
+      @import url(https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700,400italic);
+
+      body { font-family: 'Droid Serif'; }
+      h1, h2, h3 {
+        font-family: 'Yanone Kaffeesatz';
+        font-weight: normal;
+      }
+      .remark-code { font-family: 'Source Code Pro', 'Lucida Console', Monaco, monospace; font-size: 20px;}
+      .remark-inline-code { font-family: 'Source Code Pro', 'Lucida Console', Monaco, monospace; font-size: 20px;}
+      .remark-slide-content { font-family: 'Source Code Pro', 'Lucida Console', Monaco, monospace; font-size: 20px;}
+      .hljs { font-family: 'Source Code Pro', 'Lucida Console', Monaco, monospace; font-size: 20px;}
+    </style>
+  </head>
+  <body>
+    <textarea id="source">
+
+Troubleshooting algorithm
+=========================
+* ceph -s (ceph -w/ watch -n 1 ceph -s)
+* detect type of issue
+* ceph health detail
+* ceph osd tree
+* ceph pg dump
+* read ceph.log from any monitor node
+* read osd logs of stale osd
+* http://docs.ceph.com/docs/kraken/rados/troubleshooting/troubleshooting-osd/
+* https://access.redhat.com/documentation/en-us/red_hat_ceph_storage/3/html/troubleshooting_guide/
+* google for error message
+
+---
+```bash
+# ceph -s
+cluster f119d79d-45fe-47ff-a8e1-0890a9d08c29
+ health HEALTH_WARN
+        2025 pgs degraded
+        2025 pgs stuck degraded
+        2054 pgs stuck unclean
+        2025 pgs stuck undersized
+        2025 pgs undersized
+        recovery 33377551/3302607036 objects degraded (1.011%)
+        recovery 523294/3302607036 objects misplaced (0.016%)
+        18/1959 in osds are down
+        noout,noscrub,nodeep-scrub flag(s) set
+monmap e1: 3 mons at {ceph-mon01=192.168.20.101:6789/0...
+       election epoch 4356, quorum 0,1,2 ceph-mon01, ...
+osdmap e283035: 2007 osds: 1971 up, 1959 in; ...
+       flags noout,noscrub,nodeep-scrub,sortbitwise,...
+ pgmap v17591445: 72658 pgs, 19 pools, 1404 TB data,...
+        4261 TB used, 5260 TB / 9521 TB avail
+        33377551/3302607036 objects degraded (1.011%)
+        523294/3302607036 objects misplaced (0.016%)
+           70604 active+clean
+            2025 active+undersized+degraded
+              29 active+remapped
+client io 1513 MB/s rd, 570 MB/s wr, 23416 op/s rd, 7613 op/s
+```
+---
+```bash
+cluster f119d79d-45fe-47ff-a8e1-0890a9d08c29
+ health HEALTH_ERR
+        43 pgs are stuck inactive for more than 300 seconds
+        22 pgs backfill_wait
+        ...
+        53 requests are blocked > 32 sec
+        recovery 4403834/3303282768 objects degraded (0.133%)
+        recovery 346954/3303282768 objects misplaced (0.011%)
+        2/1959 in osds are down
+        noout,noscrub,nodeep-scrub flag(s) set
+ monmap e1: 3 mons at {ceph-mon01=192.168.20.101:6789/0...
+        election epoch 4356, quorum 0,1,2 ceph-mon01, ...
+ osdmap e283035: 2007 osds: 1971 up, 1959 in; ...
+        flags noout,noscrub,nodeep-scrub,sortbitwise,...
+  pgmap v17591445: 72658 pgs, 19 pools, 1404 TB data,...
+        4251 TB used, 5269 TB / 9521 TB avail
+        4403834/3303282768 objects degraded (0.133%)
+        346954/3303282768 objects misplaced (0.011%)
+           71228 active+clean
+            1009 active+recovery_wait+degraded
+             250 active+undersized+degraded
+             110 peering
+                ...
+recovery io 695 MB/s, 22496 keys/s, 363 objects/s
+client io 488 MB/s rd, 308 MB/s wr, 8517 op/s rd, ..
+```
+
+---
+```bash
+# ceph health detail
+...
+pg 12.9861 is active+undersized+degraded, acting [861,542]
+pg 12.98ae is active+undersized+degraded, acting [1657,407]
+pg 12.98df is active+undersized+degraded, acting [593,151]
+pg 12.9912 is active+undersized+degraded, acting [1357,1167]
+pg 12.996c is active+undersized+degraded, acting [779,1701]
+recovery 33383707/3302909406 objects degraded (1.011%)
+recovery 523341/3302909406 objects misplaced (0.016%)
+osd.1364 is down since epoch 282880, last address ...
+osd.1365 is down since epoch 282881, last address ...
+osd.1366 is down since epoch 282880, last address ...
+...
+```
+
+---
+PG status
+=========
+
+http://docs.ceph.com/docs/mimic/rados/operations/pg-states/
+
+* Active
+* Clean
+* Down
+* Scrubbing
+* Degraded
+* Inconsistent
+* Peering
+* Recovering
+* Incomplete
+* Stale
+* Undersized
+
+
+---
+OSD failure
+===========
+
+
+* ceph osd find OSDID
+* go to node
+* check is process running
+* check cpu/disks status
+* read process logs
+
+---
+OSD not starting
+================
+
+---
+OSD flapping
+============
+
+---
+Mon flapping
+============
+
+---
+undersized PG
+=============
+
+---
+missing objects
+===============
+
+
+---
+Slow requests
+=============
+
+```bash
+osd.4 [WRN] 1 slow requests, 1 included below;
+    oldest blocked for > 60.235452 secs
+osd.4 [WRN] slow request 60.235452 seconds old,
+    received at 2013-03-27
+    19:01:58.127010: osd_op(client.4757.0:1
+    baba [writefull 0~4194304]
+    3.f9c3dd2e) v4 currently waiting for subops from [1, 2]
+```
+
+* ceph daemon osd.OSD_NUM dump_historic_ops
+* ceph daemon osd.OSD_NUM dump_ops_in_flight
+* find stage, which takes anourmous amount of time
+  be aware that stages are not fully sequentiall
+---
+
+```bash
+"description": "osd_op(client.486217263.0:546373393
+    rbd_data.d3842a49b8925f.0000000000043ee9 [] snapc
+    ack+ondisk+write+known_if_redirected e282988)",
+"initiated_at": "2018-06-26 00:45:30.009736",
+"age": 472.607526,
+"duration": 2.967318,
+"type_data": [
+    "commit sent; apply or cleanup",
+    {"client": "client.486217263", "tid": 546373393}, [
+time: 00:45:30.009736, event: initiated
+time: 00:45:30.009833, event: queued_for_pg
+time: 00:45:30.009877, event: reached_pg
+time: 00:45:30.010034, event: waiting for rw locks
+time: 00:45:32.815864, event: reached_pg
+time: 00:45:32.815934, event: started
+time: 00:45:32.816022, event: waiting for subops from 531,10
+time: 00:45:32.816494, event: commit_queued_for_journal_write
+time: 00:45:32.816545, event: write_thread_in_journal_buffer
+time: 00:45:32.816706, event: journaled_completion_queued
+time: 00:45:32.816728, event: op_commit
+time: 00:45:32.817123, event: sub_op_commit_rec from 10
+time: 00:45:32.817652, event: sub_op_commit_rec from 531
+time: 00:45:32.817686, event: commit_sent
+time: 00:45:32.977022, event: op_applied
+time: 00:45:32.977054, event: done
+]
+```
+
+---
+Not enought space
+=================
+
+```bash
+ceph health
+HEALTH_ERR 1 nearfull osds, 1 full osds
+osd.2 is near full at 85%
+osd.3 is full at 97%
+```
+
+* ceph osd df
+* ceph df
+* ceph osd reweights
+* ceph osd crush reweights
+* change full/nearfull ratio
+    - ceph pg set_nearfull_ratio 0.9
+    - ceph pg set_full_ratio 0.98
+    - NO reweight_by_utilization
+* upmap extention from luminous, need luminous client
+
+---
+Not enought space
+=================
+
+```bash
+# ceph osd df
+ID   WEIGHT  REWEIGHT SIZE  USE    AVAIL %USE  VAR  PGS
+1750 1.74599  1.00000 1787G   603G 1183G 33.78 0.76  92
+1751 1.74599  1.00000 1787G   613G 1173G 34.34 0.77  92
+1752 1.74599  1.00000 1787G   542G 1245G 30.35 0.68  85
+1753 1.74599  1.00000 1787G   599G 1188G 33.52 0.75  91
+...
+TOTAL 9521T  4256T 5265T 44.70
+MIN/MAX VAR: 0.01/1.35  STDDEV: 7.26
+```
+
+```bash
+# ceph df
+GLOBAL:
+    SIZE      AVAIL     RAW USED     %RAW USED
+    9521T     5265T        4256T         44.70
+POOLS:
+ NAME                     ID  USED   %USED MAX AVAIL  OBJECTS
+ rbd                       0 27060M     0   1073T       6766
+ cinder-volumes            8  290T  21.28   1073T   78049164
+ default.rgw.buckets.data 12 1045T  49.34   1073T 1006936362
+```
+
+    </textarea>
+    <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+    <script src="http://gnab.github.io/remark/downloads/remark-latest.min.js" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS_HTML&delayStartupUntil=configured" type="text/javascript"></script>
+    <script type="text/javascript">
+      var slideshow = remark.create();
+
+      // Setup MathJax
+      MathJax.Hub.Config({
+          tex2jax: {
+          skipTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+          }
+      });
+
+      MathJax.Hub.Configured();
+    </script>
+  </body>
+</html>
