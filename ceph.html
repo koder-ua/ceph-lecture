@@ -394,14 +394,22 @@ osd tree
 ========
 ```bash
 root@ceph-lum0:/home/koder# ceph osd tree
-ID CLASS WEIGHT  TYPE NAME         STATUS REWEIGHT PRI-AFF
--1       0.06116 root default
--3       0.02039     host ceph-lum0
-0   hdd 0.02039         osd.0         up  1.00000  1.0000
--5       0.02039     host ceph-lum1
-2   hdd 0.02039         osd.2         up  1.00000  1.0000
--7       0.02039     host ceph-lum2
-1   hdd 0.02039         osd.1         up  1.00000  1.0000
+ID CLASS WEIGHT  TYPE NAME                 STATUS REWEIGHT PRI-AFF
+-1      216.000 root defaut
+-1      72.0000    room room02
+-1      18.0000       rack rack2
+-3      6.00000            host ceph021
+0   hdd 2.00000                 osd.0         up  1.00000  1.0000
+1   hdd 2.00000                 osd.1         up  1.00000  1.0000
+2   hdd 2.00000                 osd.2         up  1.00000  1.0000
+-5      6.00000            host ceph022
+3   hdd 2.00000                 osd.3         up  1.00000  1.0000
+4   hdd 2.00000                 osd.4         up  1.00000  1.0000
+5   hdd 2.00000                 osd.5         up  1.00000  1.0000
+-7      6.00000            host ceph023
+6   hdd 2.00000                 osd.6         up  1.00000  1.0000
+7   hdd 2.00000                 osd.7         up  1.00000  1.0000
+8   hdd 2.00000                 osd.8         up  1.00000  1.0000
 ```
 
 ---
@@ -434,6 +442,7 @@ tunable allowed_bucket_algs 54
 device 0 osd.0 class hdd
 device 1 osd.1 class hdd
 device 2 osd.2 class hdd
+....
 ```
 
 ---
@@ -455,45 +464,39 @@ type 10 root
 ---
 ```bash
 # buckets
-host ceph-lum0 {
+host ceph021 {
 	id -3		# do not change unnecessarily
 	id -4 class hdd		# do not change unnecessarily
-	# weight 0.020
+	# weight 6.0
 	alg straw2
 	hash 0	# rjenkins1
-	item osd.0 weight 0.020
+    item osd.11 weight 2.000
+    item osd.12 weight 2.000
+    item osd.13 weight 2.000
 }
-host ceph-lum1 {
-	id -5		# do not change unnecessarily
-	id -6 class hdd		# do not change unnecessarily
-	# weight 0.020
-	alg straw2
-	hash 0	# rjenkins1
-	item osd.2 weight 0.020
+
+rack Rack2 { ...
+    item ceph020 weight 6.000
+    item ceph021 weight 6.000
+    item ceph022 weight 6.000
 }
-host ceph-lum2 {
-	id -7		# do not change unnecessarily
-	id -8 class hdd		# do not change unnecessarily
-	# weight 0.020
-	alg straw2
-	hash 0	# rjenkins1
-	item osd.1 weight 0.020
+
+room ROOM02 {...}
+
+root default {
+    ...
+    item ROOM01 weight 72.000
+    item ROOM02 weight 72.000
+    item ROOM03 weight 72.000
 }
 ```
 
 ---
-```bash
-root default {
-	id -1		# do not change unnecessarily
-	id -2 class hdd		# do not change unnecessarily
-	# weight 0.061
-	alg straw2
-	hash 0	# rjenkins1
-	item ceph-lum0 weight 0.020
-	item ceph-lum1 weight 0.020
-	item ceph-lum2 weight 0.020
-}
 
+<center><img src="images/crush_map.jpeg" width="800"></center>
+
+---
+```bash
 # rules
 rule replicated_rule {
 	id 0
