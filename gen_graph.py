@@ -1,3 +1,4 @@
+import sys
 import numpy
 from matplotlib import pyplot
 import seaborn
@@ -51,8 +52,7 @@ def iops_plot(ax):
 
 
 fig, ax = pyplot.subplots()
-iops = False
-if iops:
+if sys.argv[1] == 'iops':
     ax.set_xscale("log", nonposx='clip')
     iops_plot(ax)
 else:

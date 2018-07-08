@@ -38,6 +38,7 @@ Distributed storage
 
 * Nodes/disks unreliable - data duplication
 * Self-recovery on node failure
+* Failure types
 * CP vs AP - system behaviour in case of failure
 
 ---
@@ -51,8 +52,13 @@ Comparision
 * netapp & Co
 
 ---
-Ceph
+<center>Ceph</center>
 ====
+<center><img src="images/ceph-arch.jpg" width="800"></center>
+
+---
+Protocols
+=========
 
 * rados
 * rbd
@@ -64,6 +70,25 @@ Ceph
 <center><img src="images/ceph-all-api.png" width="400"></center>
 
 ---
+Versions
+========
+
+|  Name     | Version| Released |
+|:---------:|:------:|:--------:|
+| Firefly   | 0.80.X | May 2014 |
+| Giant     | 0.87.X | Oct 2014 |
+| Hammer    | 0.94.X | Apr 2015 |
+| Infernalis|  9.2.X | Nov 2015 |
+| Jewel     | 10.2.X | Apr 2016 |
+| Kraken    | 11.2.X | Jan 2017 |
+| Luminous  | 12.2.X | Aug 2017 |
+| Mimic     | 13.2.X | Jun 2018 |
+
+* X.0.Y - dev release
+* x.1.y - rc
+* x.2.y - stable
+
+---
 Ceph config & co
 ================
 
@@ -71,13 +96,13 @@ Ceph config & co
 * /etc/ceph/ceph.client.admin.keyring
 
 ```bash
-# ll /var/run/ceph
-total 0
-drwxrwx---  2 ceph ceph 100 Jun 25 20:04 ./
-drwxr-xr-x 24 root root 900 Jun 25 20:15 ../
-srwxr-xr-x  1 ceph ceph   0 Jun 25 20:04 ceph-mgr.ceph-lum0.asok=
-srwxr-xr-x  1 ceph ceph   0 Jun 25 20:04 ceph-mon.ceph-lum0.asok=
-srwxr-xr-x  1 ceph ceph   0 Jun 25 20:04 ceph-osd.0.asok=
+> ll /var/run/ceph
+srwxr-xr-x  1 ceph ceph 0 ceph-mgr.ceph-lum0.asok=
+srwxr-xr-x  1 ceph ceph 0 ceph-mon.ceph-lum0.asok=
+srwxr-xr-x  1 ceph ceph 0 ceph-osd.0.asok=
+
+> CEPH_ARGS="-c /etc/ceph-lum/ceph.conf
+    -k /etc/ceph-lum/ceph.client.admin.keyring"
 ```
 
 ---
@@ -86,23 +111,18 @@ Ceph config & co
 
 ```bash
 # ll /var/log/ceph
-total 59416
-drwxrwx---  2 ceph ceph       4096 Nov 27  2017 ./
-drwxrwxr-x 10 root syslog     4096 Dec  1  2017 ../
--rw-------  1 ceph ceph      49611 Jun 25 20:05 ceph.audit.log
--rw-------  1 ceph ceph     492853 Jun 25 20:05 ceph.log
--rw-r--r--  1 ceph ceph   16326525 Jun 25 20:20 ceph-mgr.ceph-lum0.log
--rw-r--r--  1 ceph ceph   16401900 Jun 25 20:20 ceph-mon.ceph-lum0.log
--rw-r--r--  1 ceph ceph   27505663 Jun 25 20:05 ceph-osd.0.log
--rw-r--r--  1 root root      20750 Jun 25 20:04 ceph-osd.admin.log
+ceph ceph      49611 Jun 25 20:05 ceph.audit.log
+ceph ceph     492853 Jun 25 20:05 ceph.log
+ceph ceph   16326525 Jun 25 20:20 ceph-mgr.ceph-lum0.log
+ceph ceph   16401900 Jun 25 20:20 ceph-mon.ceph-lum0.log
+ceph ceph   27505663 Jun 25 20:05 ceph-osd.0.log
+root root      20750 Jun 25 20:04 ceph-osd.admin.log
 ```
 
 ---
 ceph -s
 =======
 ```bash
-# export CEPH_ARGS="-c /etc/ceph-lum/ceph.conf
-    -k /etc/ceph-lum/ceph.client.admin.keyring"
 # ceph -s
   cluster:
     id:     1062565d-07df-4f01-9640-e89b7ae5ed4d
@@ -703,6 +723,13 @@ Flags
 * noin
 * norecover
 * nobackfill
+
+---
+perf testing
+============
+
+* No rados bench
+* rbd bench
 
 ---
 Hardware settings

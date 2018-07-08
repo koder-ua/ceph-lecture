@@ -20,13 +20,23 @@
   <body>
     <textarea id="source">
 
-Plan
-=========
+About
+=====
 
-* Storages overview: parameters,
-  structure, types (only block storage)
-* SATA/SAS/NVME, HDD/SSD/Optane & Co
-* How to monitor/test
+* Kostiantyn Danylov
+* github.com/koder-ua
+* python/ceph
+* [slides github.com/koder-ua/ceph-lecture](https://github.com/koder-ua/ceph-lecture)
+
+---
+General plan
+============
+
+* Storage devices - SSD/HDD & Co
+* RAID/LVM
+* monitoring & performance testing
+* network storages, ceph
+* ceph troubleshutting
 
 ---
 Storage
@@ -40,67 +50,63 @@ Storage
 * few words about shared FS (cephfs/glusterfs/...)
 
 ---
-Requirements
-============
+Definitions
+===========
+
+* write amplification
+* fragmentation
+* sector remapping
+* latency
+* bandwith (throutput)
+* IOPS (input/output operations per second)
+* QD (queue depth)
+* lazy/delayed allocation
+* Mi == 1024 \* 1024, M == 1000 \* 1000
+* k is used as synonym to Ki
+
+---
+QD
+==
+
+```bash
+     QD        WPS    LAT(ms)
+     1.1      2800     17
+     2.9      5640     23
+     9.5     16000     60
+```
+
+---
+Storage Requirements
+====================
 
 * Data safety
 * Performance/scalability
 * Functionality
 
 ---
-Performance
-===========
-
-* latency
-* iops
-* BW
-* [Biased benchmarks](http://matthewrocklin.com/blog/work/2017/03/09/biased-benchmarks)
-
----
-IOPS, BW, latency = func(QD)
-============================
-
-* QD is very important
-* QD == 1 --> latency == 1 / IOPS
-
-.center[![](images/iops_lat_qd.png)]
-
----
-Latency distribution
-====================
-<img src="images/lat_distribution.gif" width="800">
-
----
-Average vs mediana/percentiles
-==============================
-
-{m1, m2, m3, ...} -> V1, V2, ...
-
-Average
--------
-* Direct outcome of min-square error
-* Hightly affected by outliers
-* Low-noisy symmetric distribution.
-  E.g. Normal, etc (p = e**(-x**2)).
-* IOPS, BW
-
-Mediana/percentiles
--------------------
-* Direct outcome of min module error
-* Less affected by ouliers, works for asymetric data
-* Latency
-
----
 Disk protocols
 ==============
 
 * (P)ATA (IDE) - Advanced Technology
-    Attachment
-* SATA - Serial ATA. SATA3 ~ 600 MiBps
-* SCSI - Small Computer System Interface
-* SAS - Serial Attached SCSI ~ 1.4GiBps
+    Attachment, some has partial TCQ
+* SATA - Serial ATA. SATA3 ~ 600 MiBps,
+    hot plug, NCQ
+* (P)SCSI - Small Computer System Interface, TCQ
+* SAS - Serial Attached SCSI ~ 1.5GiBps
 * NVME - Non-Volatile Memory Host Controller
-    Interface ~ 4GiBps (4xPCI Gen 3)
+    Interface ~ 5GiBps (4xPCI Gen 3),
+    64k queues with 64k cmd each
+
+---
+Storage devices
+===============
+
+* All based on quite unreliable grounds
+* Very complex internal structure
+* Millions lines of control code
+* Caches, queues, schedulers
+* BTree-based structures
+* Parity checks, error correction codes, etc
 
 ---
 HDD structure
@@ -115,6 +121,10 @@ HDD data
 ---
 Constant linear size
 ====================
+
+* actually mixed - several collocated sectors
+    shares same angular size
+
 <table cellpadding="20" cellspacing="20" width="100%"><td valign="center">
 <tr><img src="images/sectors_size.jpg" width="330"></tr>
 <tr><img src="images/hdd_BW_from_track.png" width="300"></tr>
@@ -129,30 +139,32 @@ HDD
     - 10ms / 7ms lat
     - 80-150 MiBps linear
     - READ == WRITE
-    - ~64MiB RAM cache
+    - up to 64MiB RAM cache
 
 * SAS(15k)
     - 3ms lat
     - 180-250 MiBps linear
     - READ == WRITE
-    - ~256MiB RAM cache
+    - up to 256MiB RAM cache
 
-* SMR (Shingled magnetic recording)
-* LAR/MAR
-* vulnerable to physical stress
+* SMR/LAR/MAR
+
+---
+vulnerable to physical stress
+=============================
+
+* head parking
+* accelerometer
+
+https://www.youtube.com/watch?v=tDacjrSCeq4
+
+<center><img src="images/hdd_spinning.jpg" width="400"></center>
 
 ---
 SSD
 ===
 
 <center><img src="images/SSD.png" width="600"></center>
-
----
-SSD
-===
-
-<center><img src="images/SSD_IOPS_over_time.png" width="400"></center>
-<center><img src="images/ssd_trim.png" width="400"></center>
 
 ---
 SSD
@@ -169,34 +181,38 @@ SSD
 * erasure slow and descructive opearation,
   which limits SSD lifetime
   (look for wearing level)
-* mixed load VERY slow
+* Impossible to safely delete data
+
+---
+SSD
+===
+<center><img src="images/SSD_IOPS_over_time.png" width="600"></center>
+
+---
+SSD
+===
+<center><img src="images/ssd_trim.png" width="600"></center>
 
 ---
 SSD
 ===
 
-* Impossible to safely delete data
 * SLC/MLC/TLC/QLC
 * xLC cache
 
 <center><img src="images/slc_mlc_tlc.jpeg" width="600"></center>
 
 ---
-SSD
-===
+Performance
+===========
 
 * read - 1M+ IOPS, 100mks lat, QD>32
 * write - 100-100k IOPS,
   100mks-100ms lat, QD>32,
   might be VERY inconsistent
+* mixed load
 
 <center><img src="images/ssd_mixed_load.png" width="500"></center>
-
-
----
-SSD
-===
-    request_time = random.rand(1, 100000000)
 
 ---
 NVME SSD
@@ -233,8 +249,8 @@ Optane
 Overview
 ========
 
-* HDD becaming a new tape
-* SSD becaming a new HDD
+* HDD slowly becaming a new tape
+* SSD very slowly becaming a new HDD
 * NVME is quite fast
 * New technologies closing to DRAM speed
 
@@ -256,11 +272,13 @@ Result table
 
 * Your mileage may vary (for SSD/NVME)
 
-|          | Size, TiB | $/TiB | IOPS WR | IOPS RD | BW WR MB| BW RD MB| Lat ms |
-|:--------:|----------:|:-----:|:-------:|:-------:|:-------:|:-------:|:------:|
-| SATA HDD | 10        | 25-50 | 50-150  | 50-150  | 100-150 | 100-150 | 3-7    |
-| SSD      | 2         | 200   | 100-5k  | 1k-20k  |  50-400 | 200-500 | 0.1-1  |
-| NVME     | 2         | 400   | 400-20k | 2k-50k  | 200-1.5k| 500-2k  | 0.01-1 |
+|            | Size, TiB |  $/TiB  | IOPS WR | IOPS RD | BW WR MB | BW RD MB | Lat ms  |
+|:----------:|----------:|:-------:|:-------:|:-------:|:--------:|:--------:|:-------:|
+| SATA HDD   | 10        | 25-50   | 50-150  | 50-150  | 100- 150 | 100-150  | 3-7     |
+| SSD        | 2         |  200    | 100-5k  | 1k-20k  |  50- 400 | 200-500  | 0.1-1   |
+| NVME       | 2         |  400    | 400-20k | 2k-50k  | 200-1500 | 500-2000 | 0.01-1  |
+| DRAM(8700k)| 0.1       |  10k    | 2000M   | 2500M   |    20000 |    20000 | 0.000015|
+| 10G Net    | -         |  -      |  150k   | 150k    |     1250 |     1250 | 0.03    |
 
 ---
 Caches & buffers
@@ -271,14 +289,15 @@ Caches & buffers
 * caches - read/write? fast/small
   temporary storage
 
-Cache modes:
-============
+Cache modes
+-----------
 
 * Write-back
 * Write-through
+* Write-around
 
 ---
-Tuplical linux caches
+Typlical linux caches
 =====================
 
 * User space process            X GB RAM
@@ -289,9 +308,8 @@ Tuplical linux caches
 * Disk cache                   XX MB RAM
 * Disk tier                    XX GB FLASH
 
----
-Net Caches
-==========
++Net Caches
+===========
 
 * qemu/vm cache
 * rbdlib cache
@@ -308,21 +326,6 @@ Sync modes
 * Direct IO - bypass all caches up to device
 * Sync IO - bypass/flash all(*not really)
   caches before IO confirmed
-
----
-qcow2 & co
-==========
-
-* lazy allocation
-* write amplification
-
----
-Disk usage patterns
-===================
-
-* SQLDB
-* Journals
-* etc
 
 ---
 RAID 0 - stripe
@@ -363,14 +366,22 @@ RAID
 * RAID controllers
 * caches
 * battery
-
+* JBOD vs RAID0
 
 ---
 LVM/dmsetup
 ===========
-Block mapping, Compression, dedup, encryption
+<center><img src="images/LVM-block-remapping.png" width="830"></center>
 
-<img src="images/lvm.png" width="700">
+---
+LVM/dmsetup
+===========
+
+* Block mapping
+* Compression
+* encryption
+* snapshotting (vs. VSS)
+* No dedup
 
 ---
 Monitoring & testing
@@ -383,20 +394,11 @@ List drives
 ```bash
 ~ ᐅ ls /sys/block
 nvme0n1  sda  sdb
-
-# use <$FNAME instead
-~ ᐅ for name in $(ls -d /sys/block/sd? /sys/block/nvme?n?)
-do
-    rot=$(cat $name/queue/rotational)
-    scheduler=$(cat $name/queue/scheduler)
-    fname=$(basename $name)
-    echo "$fname rotational=$rot scheduler=$scheduler"
-done
-
-sda rotational=0 scheduler=noop deadline [cfq]
-sdb rotational=1 scheduler=noop deadline [cfq]
-nvme0n1 rotational=0 scheduler=[none]
 ```
+
+* lots of drives info /sys/block/sd?/*
+* /sys/block/sd?/queue/rotational
+* /sys/block/sd?/queue/scheduler
 
 ---
 ```bash
@@ -411,6 +413,16 @@ sdb           8:16   0   3.7T  0 disk
 └─sdb1        8:17   0   3.7T  0 part /media/koder/...
 nvme0n1     259:0    0 465.8G  0 disk
 └─nvme0n1p1 259:1    0 465.8G  0 part /
+
+~ ᐅ lsblk -o name,rota,sched,rq-size,min-io,model
+NAME        ROTA SCHED RQ-SIZE MIN-IO MODEL
+sda            0 cfq       128    512 Samsung SSD 840
+├─sda1         0 cfq       128    512
+└─sda2         0 cfq       128    512
+sdb            1 cfg        16   4096
+└─sdb1         1 cfg        16   4096
+nvme0n1        0 none     1023    512 Samsung SSD 960 EVO
+└─nvme0n1p1    0 none     1023    512
 
 ```
 
@@ -473,16 +485,20 @@ Tasks: 531 total,   1 running, 530 sleeping,   0 stopped,   0 zombie
 KiB Mem : 65611812 total, 19063468 free, 19354020 used, 27194324 buff/cache
 KiB Swap: 33554428 total, 33554428 free,        0 used. 44842900 avail Mem
 
-  PID USER      PR  NI    VIRT    RES    SHR S  %CPU %MEM     TIME+ COMMAND
- 5459 root      20   0  737028 256092 142408 S  10.2  0.4  24:10.87 Xorg
- 5640 koder     20   0 6357652 1.383g 110132 S   9.5  2.2  61:28.33 gnome-shell
-10368 koder     20   0  641820  58404  33700 S   5.9  0.1   0:18.26 python2
- 6433 koder     20   0 1985160 565556 206300 S   3.3  0.9  76:42.56 chrome
-10013 koder     20   0 1818732 306256 141324 S   3.0  0.5  12:11.14 atom
-10055 koder     20   0 2803552 395564 138652 S   2.6  0.6  18:13.92 atom
-23617 root      20   0 3754464 1.126g  17624 S   2.3  1.8  10:31.83 qemu-system-x86
-11457 koder     20   0 1334168 189476  84764 S   2.0  0.3   0:44.20 chrome
-25406 koder     20   0 2164744 250720 110520 S   2.0  0.4  10:17.57 Telegram
+```
+
+---
+iotop
+=====
+
+```bash
+Total DISK READ :       0.00 B/s | Total DISK WRITE :     661.71 K/s
+Actual DISK READ:       0.00 B/s | Actual DISK WRITE:       0.00 B/s
+  TID  PRIO  USER     DISK READ  DISK WRITE  SWAPIN     IO>    COMMAND
+16095 be/4 koder       0.00 B/s  661.71 K/s  0.00 %  0.00 % chrome [TaskSchedulerFo]
+    1 be/4 root        0.00 B/s    0.00 B/s  0.00 %  0.00 % init splash
+    2 be/4 root        0.00 B/s    0.00 B/s  0.00 %  0.00 % [kthreadd]
+    4 be/0 root        0.00 B/s    0.00 B/s  0.00 %  0.00 % [kworker/0:0H]
 ```
 
 ---
@@ -605,6 +621,15 @@ Performance tests
     - tpc
     - spc
     - vdbench
+* [Biased benchmarks](http://matthewrocklin.com/blog/work/2017/03/09/biased-benchmarks)
+
+---
+Disk usage patterns
+===================
+
+* SQLDB
+* Journals
+* etc
 
 ---
 <center># dd bs=4K oflags=direct ..</center>
@@ -612,12 +637,68 @@ Performance tests
 
 .center[![](images/dd_tests.jpg)]
 
+
+---
+Histogram
+=========
+
+<center><img src="images/histogram.gif" width="500"></center>
+
+---
+Average vs mediana/percentiles
+==============================
+
+{m1, m2, m3, ...} -> V1, V2, ...
+
+Average
+-------
+* Direct outcome of min-square error
+* Hightly affected by outliers
+* Low-noisy symmetric distribution.
+  E.g. Normal, etc (p = e**(-x**2)).
+* IOPS, BW
+
+Mediana/percentiles
+-------------------
+* Direct outcome of min module error
+* Less affected by ouliers, works for asymetric data
+* Latency
+
+---
+Normal ditribution
+==================
+<center><img src="images/standard-normal-distribution.jpg" width="600"></center>
+
+---
+Latency distribution
+====================
+<center><img src="images/lat_distribution.gif" width="800"></center>
+
+---
+IOPS, BW, latency = func(QD)
+============================
+
+* QD is very important
+* QD == 1 --> latency == 1 / IOPS
+
+<center><img src="images/iops_lat_qd.png" width="600"></center>
+
 ---
 Performance test
 ================
 ```bash
 dd if=/dev/zero of=/... bs=16M count=1K oflags=direct
 ```
+---
+Test selection
+==============
+* block sizes (512B-16MiB+)
+* sync mode - sync/direct/async
+* op - read/write/mixed
+* offsets - sequential/random
+* ????
+* QD
+* parallel streams
 
 ---
 Performance test: fio
