@@ -270,9 +270,10 @@ class Animation {
         this.cell_size = min(cell_size_w_limit, cell_size_h_limit);
         this.req_radius = (this.cell_size - space) / 2;
 
-        this.qd_label = this.raphael.text(100, 50, `QD = ${qd}`).attr({'font-size': fs_large});
-        this.rps_label = this.raphael.text(100, 100, "RPS = ---").attr({'font-size': fs_large});
-        this.lat_label = this.raphael.text(100, 150, "LAT = ---").attr({'font-size': fs_large});
+        this.qd_label = this.raphael.text(150, 50, `Target QD = ${qd}`).attr({'font-size': fs_large});
+        this.atc_qd_label = this.raphael.text(150, 100, `Actual QD = --`).attr({'font-size': fs_large});
+        this.rps_label = this.raphael.text(150, 150, "RPS = ---").attr({'font-size': fs_large});
+        this.lat_label = this.raphael.text(150, 200, "LAT = ---").attr({'font-size': fs_large});
 
         this.track_start_x = this.draw_app_queue(this.new_reqs_x) + space;
         this.track_conn_pt_x = null;
@@ -297,10 +298,10 @@ class Animation {
                     self.paused = !self.paused;
                 } else if (evt.code === "ArrowUp") {
                     self.qd++;
-                    this.qd_label.attr({"text": `QD = ${self.qd}`});
+                    this.qd_label.attr({"text": `Target QD = ${self.qd}`});
                 } else if (evt.code === "ArrowDown" && self.qd > 1) {
                     self.qd--;
-                    this.qd_label.attr({"text": `QD = ${self.qd}`});
+                    this.qd_label.attr({"text": `Target QD = ${self.qd}`});
                 }
             }, false);
 
@@ -344,6 +345,7 @@ class Animation {
         }
 
         if (ctime - this.stime > 1.0) {
+            this.atc_qd_label.attr({"text": `Actual QD = ${this.total_active_reqs}`});
 
             while(this.history.length !== 0 && ctime - this.history[0][0] > average_slice)
                 this.history.shift();
