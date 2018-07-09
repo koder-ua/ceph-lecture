@@ -170,11 +170,12 @@ function arrow(x1, y1, x2, y2, arr_part, angle) {
 const space = 10;
 const border = space;
 const q_cells = 7;
-const app_q_cells = 5;
+const app_q_cells = 3;
 const from_main_q_tracks_w = 150;
 const main_q_storage_space = 100;
 const fs_large = 34;
 const fs_normal = 20;
+const fs_normal_plus = 34;
 
 const produce_loop_timeout = 200;
 const request_shift_time = 200;
@@ -182,8 +183,10 @@ const process_loop_tout = 500;
 const process_loop_tout_short = 100;
 const process_loop_tout_hmove = 10;
 const move_input_req_loop_tout = 200;
+const text_color_tout = 1000;
 const move_speed = 0.7;
 const move_speed2 = 1.5;
+const average_slice = 10;
 
 const start_req_c = 0;
 const bus_stroke_with = 1;
@@ -267,7 +270,7 @@ class Animation {
         this.cell_size = min(cell_size_w_limit, cell_size_h_limit);
         this.req_radius = (this.cell_size - space) / 2;
 
-        this.raphael.text(100, 50, `QD = ${qd}`).attr({'font-size': fs_large});
+        this.qd_label = this.raphael.text(100, 50, `QD = ${qd}`).attr({'font-size': fs_large});
         this.rps_label = this.raphael.text(100, 100, "RPS = ---").attr({'font-size': fs_large});
         this.lat_label = this.raphael.text(100, 150, "LAT = ---").attr({'font-size': fs_large});
 
@@ -281,12 +284,26 @@ class Animation {
         this.draw_storage(this.storage_start_x);
         this.draw_heads(this.storage_start_x);
         this.app_q_animation_in_progress = false;
-        this.processed = 0;
-        this.total_lat = 0;
         this.stime = new Date().getTime() / 1000;
+        this.paused = false;
+        this.history = [];
     }
 
     mainloop() {
+        let self = this;
+        window.addEventListener('keydown',
+            (evt) => {
+                if (evt.code === "Space") {
+                    self.paused = !self.paused;
+                } else if (evt.code === "ArrowUp") {
+                    self.qd++;
+                    this.qd_label.attr({"text": `QD = ${self.qd}`});
+                } else if (evt.code === "ArrowDown" && self.qd > 1) {
+                    self.qd--;
+                    this.qd_label.attr({"text": `QD = ${self.qd}`});
+                }
+            }, false);
+
         for (let i = 0; i < start_req_c; i++) {
             const req = new Request(this.cvalue, rand_int(this.qcount), rand_int(this.size));
             this.storage.send(req);
@@ -303,7 +320,7 @@ class Animation {
 
         const self = this;
         function cl() {
-            if (!self.app_q_animation_in_progress) {
+            if (!self.paused && !self.app_q_animation_in_progress) {
                 if (self.total_active_reqs < self.qd && self.app_q_reqs.length < app_q_cells) {
                     let req = new Request(self.cvalue, rand_int(self.qcount), rand_int(self.size));
                     self.draw_req(req,
@@ -315,7 +332,6 @@ class Animation {
                 }
             }
             setTimeout(cl, produce_loop_timeout);
-
         }
         cl();
     }
@@ -324,19 +340,30 @@ class Animation {
         const ctime = new Date().getTime() / 1000;
 
         if (req !== null) {
-            this.processed++;
-            this.total_lat += ctime - req.stime;
+            this.history.push([ctime, ctime - req.stime]);
         }
 
-        if (ctime - this.stime > 5.0) {
-            this.rps_label.attr({"text": `RPS = ${(this.processed / (ctime - this.stime)).toFixed(1)}`});
-            if (this.processed !== 0) {
-                this.lat_label.attr({"text": `LAT = ${(this.total_lat / this.processed).toFixed(1)}`});
+        if (ctime - this.stime > 1.0) {
+
+            while(this.history.length !== 0 && ctime - this.history[0][0] > average_slice)
+                this.history.shift();
+
+            if (this.history.length !== 0) {
+                let total_time = 0;
+                let min_time = this.history[0][0];
+                for(const rec of this.history)
+                    total_time += rec[1];
+
+                let rps = "RPS = 0";
+                if (ctime - min_time > 1.0)
+                    rps = `RPS = ${(this.history.length / (ctime - min_time)).toFixed(1)}`;
+                this.rps_label.attr({"text": rps});
+                this.lat_label.attr({"text": `LAT = ${(total_time / this.history.length).toFixed(1)}`});
             } else {
                 this.lat_label.attr({"text": "LAT = ---"});
+                this.rps_label.attr({"text": "RPS = 0"});
             }
-            this.processed = 0;
-            this.total_lat = 0;
+
             this.stime = ctime;
         }
     }
@@ -344,7 +371,7 @@ class Animation {
     move_input_requests_loop() {
         const self = this;
         function cl() {
-            if (!!self.app_q_reqs.length) {
+            if (!self.paused && !!self.app_q_reqs.length) {
                 // move first request over the bus
                 const req = self.app_q_reqs[0];
                 self.app_q_reqs.shift();
@@ -383,6 +410,10 @@ class Animation {
         let head_move_left = null;
         const head_step_max = 10;
         function cl() {
+            if (self.paused) {
+                setTimeout(cl, process_loop_tout);
+                return;
+            }
             if (head_move_left !== null) {
                 let mv = Math.sign(head_move_left) * Math.min(head_step_max, Math.abs(head_move_left));
                 exec.r_head.translate(mv, 0);
@@ -397,7 +428,6 @@ class Animation {
             if (!request_in_flight) {
                 let old_head_pos = exec.position;
                 let req = exec.tick();
-                let all_req1 = exec.all_req().length;
 
                 if (exec.position !== old_head_pos) {
                     head_move_left = (exec.position - old_head_pos) * self.cell_size;
@@ -409,6 +439,7 @@ class Animation {
                 if (!!req) {
                     // move request to head, then update storage value in cell
                     const [x, y] = req.get_xy();
+                    req.r_obj.attr({"opacity": 1.0});
                     animate_on_points(req, [
                         x, y - self.cell_size,
                         self.storage_start_x + exec.position * self.cell_size - self.cell_size / 2, y - self.cell_size
@@ -416,9 +447,10 @@ class Animation {
                         req.r_obj.remove();
                         self.sync_sqstorage_vals(exec);
                         request_in_flight = false;
+                        exec.r_texts[req.offset].attr({"fill": "#F66", "font-size": fs_normal_plus});
+                        exec.r_texts[req.offset].animate({"fill": "#000", "font-size": fs_normal}, text_color_tout);
                     });
                     request_in_flight = true;
-
                     // move all other requests in the queue
                     let xpos = self.queues_start_x + self.cell_size / 2;
                     for (const req of exec.all_req()) {
@@ -466,10 +498,10 @@ class Animation {
         for(let req of exec.all_req()) {
             if (xpos < this.queues_end_x) {
                 const [old_x, y] = req.get_xy();
-                req.r_obj.animate({"opacity": 1.0});
+                req.r_obj.attr({"opacity": 1.0});
                 req.move(xpos, y, 0);
             } else {
-                req.r_obj.animate({"opacity": 0.0});
+                req.r_obj.attr({"opacity": 0.0});
             }
             xpos += this.cell_size;
         }
@@ -546,4 +578,3 @@ class Animation {
         }
     }
 }
-
