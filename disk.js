@@ -181,7 +181,7 @@ const produce_loop_timeout = 200;
 const request_shift_time = 200;
 const process_loop_tout = 500;
 const process_loop_tout_short = 100;
-const process_loop_tout_hmove = 10;
+const process_loop_tout_hmove = 5;
 const move_input_req_loop_tout = 200;
 const text_color_tout = 1000;
 const move_speed = 0.7;
@@ -318,7 +318,6 @@ class Animation {
     }
 
     produce_req_loop() {
-
         const self = this;
         function cl() {
             if (!self.paused && !self.app_q_animation_in_progress) {
