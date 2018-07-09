@@ -6,15 +6,63 @@
         <script src="raphael.min.js" type="text/javascript" charset="utf-8"></script>
         <script src="disk.js" type="text/javascript" charset="utf-8"></script>
         <script type="text/javascript" charset="utf-8">
-            const qcount = 5;
-            const size = 10;
-            const qd = 15;
-            const w = 2000;
-            const h = 1100;
+            const unit_count = 4; // hdd count
+            const size = 10; // hdd disk size in cells
+            const start_QD = 5;  // start queue depth
+            const w = 2000;  // canvas width
+            const h = 1100;  // canvas height
+
+            // visual settings
+            const space = 10;  // space betwee nelements
+            const border = space; // space between border and first element
+            const q_cells = 7;  // hdd visual queue size
+            const app_q_cells = 3; // app queue size
+            const from_main_q_tracks_w = 150; // spaces
+            const main_q_storage_space = 100;
+
+            // font sizes
+            const fs_large = 34;
+            const fs_normal = 15;
+            const fs_normal_plus = 26;
+
+            // disk head movement max distance per tick
+            const storage_max_head_mv = 1;
+
+            // ms between new request appear from app
+            const produce_loop_timeout = 50;
+
+            // ms for shifting requests in the queue
+            const request_shift_time = 100;
+
+            // move request from app queue to hdd queue
+            const move_input_req_loop_tout = 100;
+
+            // queue -> hdd loop timeouts - normal
+            const process_loop_tout = 100;
+            // short
+            const process_loop_tout_short = 100;
+            // waiting for hdd move
+            const process_loop_tout_hmove = 20;
+
+            // updated cell color/size fade timeout
+            const text_color_tout = 1000;
+
+            // req from app queue to hdd queue move speed
+            const move_speed = 0.7;
+
+            // req to head move speed
+            const move_speed2 = 1.5;
+
+            // statistic averaging history size in seconds
+            const average_slice = 10;
+
+            const sin60 = Math.sin(Math.PI / 3);
+
             function main() {
-                let hdd = new Animation("disk", w, h, qcount, size, qd);
-                hdd.mainloop();
+                let scene = new Scene("disk", w, h, unit_count, size, start_QD);
+                scene.mainloop();
             }
+
             window.onload = main;
         </script>
     </head>

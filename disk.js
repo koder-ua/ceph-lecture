@@ -1,7 +1,35 @@
 "use strict";
 
+function last(arr) {
+    return arr[arr.length - 1];
+}
 
-class Request {
+function zip(arr1, arr2) {
+    const res = [];
+    for(let i = 0 ; i < arr1.length ; i++) {
+        res.push([arr1[i], arr2[i]]);
+    }
+    return res;
+}
+
+
+function rand_int(max) {
+    return Math.floor(Math.random() * Math.floor(max));
+}
+
+function min(a, b) {
+    return (a < b ? a : b);
+}
+
+function to_pairs(arr) {
+    let res = [];
+    for(let idx = 0 ; idx < arr.length ; idx += 2) {
+        res.push([arr[idx], arr[idx + 1]]);
+    }
+    return res;
+}
+
+class IORequest {
     constructor(value, queue, offset) {
         this.value = value;
         this.queue = queue;
@@ -19,7 +47,7 @@ class Request {
     }
 }
 
-class SQStorage {
+class StorageUnit {
     constructor(size, max_mv) {
         this.size = size;
         this.position = 0;
@@ -87,48 +115,18 @@ class SQStorage {
 }
 
 class Storage {
-    constructor(q_count, size) {
+    constructor(unit_count, unit_size) {
         this.execs = [];
-        for(let i = 0; i < q_count ; i++) {
-            this.execs.push(new SQStorage(size, 1));
+        for(let i = 0; i < unit_count ; i++) {
+            this.execs.push(new StorageUnit(unit_size, storage_max_head_mv));
         }
-        this.size = size;
-        this.q_count = q_count;
+        this.size = unit_size;
+        this.q_count = unit_count;
     }
 
     send(req) {
         this.execs[req.queue].send(req);
     }
-}
-
-function rand_int(max) {
-  return Math.floor(Math.random() * Math.floor(max));
-}
-
-
-//
-//
-//               |--------------------V
-//               |-- {oooo }      [k    k     j     ]
-//               |      |---------------------V
-//  APP [ooo] ---|-- {oo   }      [   rrr           ]
-//               |      |-----------------V
-//               |-- {ooo  }      [     a     f   g ]
-//
-//
-//
-
-
-function min(a, b) {
-    return (a < b ? a : b);
-}
-
-function to_pairs(arr) {
-    let res = [];
-    for(let idx = 0 ; idx < arr.length ; idx += 2) {
-        res.push([arr[idx], arr[idx + 1]]);
-    }
-    return res;
 }
 
 function pp(args) {
@@ -166,45 +164,6 @@ function arrow(x1, y1, x2, y2, arr_part, angle) {
     this.path(arr_path).rotate(-angle, x2, y2);
 }
 
-
-const space = 10;
-const border = space;
-const q_cells = 7;
-const app_q_cells = 3;
-const from_main_q_tracks_w = 150;
-const main_q_storage_space = 100;
-const fs_large = 34;
-const fs_normal = 20;
-const fs_normal_plus = 34;
-
-const produce_loop_timeout = 200;
-const request_shift_time = 200;
-const process_loop_tout = 500;
-const process_loop_tout_short = 100;
-const process_loop_tout_hmove = 5;
-const move_input_req_loop_tout = 200;
-const text_color_tout = 1000;
-const move_speed = 0.7;
-const move_speed2 = 1.5;
-const average_slice = 10;
-
-const start_req_c = 0;
-const bus_stroke_with = 1;
-const sin60 = Math.sin(Math.PI / 3);
-
-function last(arr) {
-    return arr[arr.length - 1];
-}
-
-function zip(arr1, arr2) {
-    const res = [];
-    for(let i = 0 ; i < arr1.length ; i++) {
-        res.push([arr1[i], arr2[i]]);
-    }
-    return res;
-}
-
-
 function animate_on_points(obj, pts, move_speed, end_cb) {
     let pairs = to_pairs(pts);
     let segments = zip(pairs.slice(0, -1), pairs.slice(1));
@@ -230,10 +189,10 @@ function animate_on_points(obj, pts, move_speed, end_cb) {
 }
 
 
-class Animation {
-    constructor(tag_id, w, h, qcount, size, qd) {
-        this.qcount = qcount;
-        this.size = size;
+class Scene {
+    constructor(tag_id, w, h, unit_count, storage_unit_size, qd) {
+        this.unit_count = unit_count;
+        this.size = storage_unit_size;
         this.qd = qd;
         this.cvalue = rand_int(5);
 
@@ -242,19 +201,19 @@ class Animation {
         this.raphael.__proto__.mlinez = mlinez;
         this.raphael.__proto__.arrow = arrow;
 
-        this.storage = new Storage(this.qcount, this.size);
+        this.storage = new Storage(this.unit_count, this.size);
         this.app_q_reqs = [];
         this.storages_v_centers = [];
         this.total_active_reqs = 0;
 
-        const stor_v_step = ((h - 2 * border) - (this.qcount * 2 - 1) * space) / (2 * this.qcount);
+        const stor_v_step = ((h - 2 * border) - (this.unit_count * 2 - 1) * space) / (2 * this.unit_count);
 
         const total_cells = app_q_cells + q_cells + this.size;
-        const cell_size_h_limit = (h - (2 * this.qcount - 1) * space - 2 * border) / this.qcount;
+        const cell_size_h_limit = (h - (2 * this.unit_count - 1) * space - 2 * border) / (2 * this.unit_count);
 
         // calc this.storage centers
         let curr_v_pos = border + stor_v_step * 1.5 + space;
-        for (let i = 0; i < this.qcount; i++) {
+        for (let i = 0; i < this.unit_count; i++) {
             this.storages_v_centers.push(curr_v_pos);
             curr_v_pos += (stor_v_step + space) * 2;
             this.storage.execs[i].ycenter = curr_v_pos;
@@ -262,7 +221,7 @@ class Animation {
         this.y_and_exec = zip(this.storages_v_centers, this.storage.execs);
         this.vcenter = (this.storages_v_centers[0] + last(this.storages_v_centers)) / 2;
 
-        // draw static part
+        // draw APP text to calculate it's size
         this.new_reqs_x = this.draw_app(border) + space;
 
         const cell_size_w_limit = (w - this.new_reqs_x - border - from_main_q_tracks_w - main_q_storage_space
@@ -270,27 +229,27 @@ class Animation {
         this.cell_size = min(cell_size_w_limit, cell_size_h_limit);
         this.req_radius = (this.cell_size - space) / 2;
 
+        this.track_conn_pt_x = null;
+        this.track_ends_x = null;
+        this.app_q_animation_in_progress = false;
+        this.paused = false;
+        this.history = [];
+        this.stime = null;
+
+
         this.qd_label = this.raphael.text(150, 50, `Target QD = ${qd}`).attr({'font-size': fs_large});
         this.atc_qd_label = this.raphael.text(150, 100, `Actual QD = --`).attr({'font-size': fs_large});
         this.rps_label = this.raphael.text(150, 150, "RPS = ---").attr({'font-size': fs_large});
         this.lat_label = this.raphael.text(150, 200, "LAT = ---").attr({'font-size': fs_large});
-
         this.track_start_x = this.draw_app_queue(this.new_reqs_x) + space;
-        this.track_conn_pt_x = null;
-        this.track_ends_x = null;
-
         this.queues_start_x = this.draw_tracks(this.track_start_x) + space;
         this.queues_end_x = this.queues_start_x + this.cell_size * q_cells;
         this.storage_start_x = this.draw_queues(this.queues_start_x) + main_q_storage_space;
         this.draw_storage(this.storage_start_x);
         this.draw_heads(this.storage_start_x);
-        this.app_q_animation_in_progress = false;
-        this.stime = new Date().getTime() / 1000;
-        this.paused = false;
-        this.history = [];
     }
 
-    mainloop() {
+    set_key_handlers() {
         let self = this;
         window.addEventListener('keydown',
             (evt) => {
@@ -304,36 +263,17 @@ class Animation {
                     this.qd_label.attr({"text": `Target QD = ${self.qd}`});
                 }
             }, false);
-
-        for (let i = 0; i < start_req_c; i++) {
-            const req = new Request(this.cvalue, rand_int(this.qcount), rand_int(this.size));
-            this.storage.send(req);
-            this.cvalue += rand_int(5);
-        }
-
-        this.produce_req_loop();
-        this.move_input_requests_loop();
-        for(const exec of this.storage.execs)
-            this.process_requests_loop(exec);
     }
 
-    produce_req_loop() {
-        const self = this;
-        function cl() {
-            if (!self.paused && !self.app_q_animation_in_progress) {
-                if (self.total_active_reqs < self.qd && self.app_q_reqs.length < app_q_cells) {
-                    let req = new Request(self.cvalue, rand_int(self.qcount), rand_int(self.size));
-                    self.draw_req(req,
-                        self.new_reqs_x + (app_q_cells - self.app_q_reqs.length - 0.5) * self.cell_size,
-                        self.vcenter);
-                    self.app_q_reqs.push(req);
-                    self.cvalue += rand_int(5);
-                    self.total_active_reqs++;
-                }
-            }
-            setTimeout(cl, produce_loop_timeout);
-        }
-        cl();
+    mainloop() {
+        this.stime = new Date().getTime() / 1000;
+        this.set_key_handlers();
+
+        setInterval(() => {produce_req_loop(this)}, produce_loop_timeout);
+        setInterval(() => {move_input_requests_loop(this)}, move_input_req_loop_tout);
+
+        for(const exec of this.storage.execs)
+            process_requests_loop(this, exec);
     }
 
     on_req_done(req) {
@@ -369,117 +309,13 @@ class Animation {
         }
     }
 
-    move_input_requests_loop() {
-        const self = this;
-        function cl() {
-            if (!self.paused && !!self.app_q_reqs.length) {
-                // move first request over the bus
-                const req = self.app_q_reqs[0];
-                self.app_q_reqs.shift();
-
-                const pts = [self.track_start_x, self.vcenter,
-                    self.track_conn_pt_x, self.vcenter,
-                    self.track_conn_pt_x, self.storages_v_centers[req.queue],
-                    self.track_ends_x, self.storages_v_centers[req.queue]];
-
-                animate_on_points(req, pts, move_speed, () => {
-                    const exec = self.storage.execs[req.queue];
-                    exec.send(req);
-                    self.update_q_req_pos(exec);
-                });
-
-                // shift other requests in queue
-                if (!!self.app_q_reqs.length) {
-                    for (const rr of self.app_q_reqs.slice(0, -1)) {
-                        const [x, y] = rr.get_xy();
-                        rr.move(x + self.cell_size, y, request_shift_time);
-                        self.app_q_animation_in_progress = true;
-                    }
-                    let rr = last(self.app_q_reqs);
-                    const [x, y] = rr.get_xy();
-                    rr.move(x + self.cell_size, y, request_shift_time, () => {self.app_q_animation_in_progress = false});
-                }
-            }
-            setTimeout(cl, move_input_req_loop_tout);
-        }
-        cl();
-    }
-
-    process_requests_loop(exec) {
-        const self = this;
-        let request_in_flight = false;
-        let head_move_left = null;
-        const head_step_max = 10;
-        function cl() {
-            if (self.paused) {
-                setTimeout(cl, process_loop_tout);
-                return;
-            }
-            if (head_move_left !== null) {
-                let mv = Math.sign(head_move_left) * Math.min(head_step_max, Math.abs(head_move_left));
-                exec.r_head.translate(mv, 0);
-                head_move_left -= mv;
-                if (Math.abs(head_move_left) < 1E-5) {
-                    head_move_left = null;
-                } else {
-                    setTimeout(cl, process_loop_tout_hmove);
-                    return;
-                }
-            }
-            if (!request_in_flight) {
-                let old_head_pos = exec.position;
-                let req = exec.tick();
-
-                if (exec.position !== old_head_pos) {
-                    head_move_left = (exec.position - old_head_pos) * self.cell_size;
-                    setTimeout(cl, process_loop_tout_hmove);
-                    return;
-                }
-
-                // requests executed
-                if (!!req) {
-                    // move request to head, then update storage value in cell
-                    const [x, y] = req.get_xy();
-                    req.r_obj.attr({"opacity": 1.0});
-                    animate_on_points(req, [
-                        x, y - self.cell_size,
-                        self.storage_start_x + exec.position * self.cell_size - self.cell_size / 2, y - self.cell_size
-                    ], move_speed2, () => {
-                        req.r_obj.remove();
-                        self.sync_sqstorage_vals(exec);
-                        request_in_flight = false;
-                        exec.r_texts[req.offset].attr({"fill": "#F66", "font-size": fs_normal_plus});
-                        exec.r_texts[req.offset].animate({"fill": "#000", "font-size": fs_normal}, text_color_tout);
-                    });
-                    request_in_flight = true;
-                    // move all other requests in the queue
-                    let xpos = self.queues_start_x + self.cell_size / 2;
-                    for (const req of exec.all_req()) {
-                        let [cx, cy] = req.get_xy();
-                        if (cx !== xpos)
-                            req.move(xpos, cy, request_shift_time);
-                        xpos += self.cell_size;
-                    }
-                    self.total_active_reqs--;
-                    self.on_req_done(req);
-                } else {
-                    self.on_req_done(null);
-                }
-                setTimeout(cl, process_loop_tout);
-            } else {
-                setTimeout(cl, process_loop_tout_short);
-            }
-        }
-        cl();
-    }
-
     // draw/update requests & storage values
     draw_req(req, x, y) {
         const circle = this.raphael.circle(x, y, this.req_radius);
         const rtext = this.raphael.text(x, y, req.value);
         rtext.attr({"font-size": fs_normal});
 
-        const color = Raphael.hsb(req.queue / this.qcount, req.offset / this.size / 1.5 + 0.1666, 1);
+        const color = Raphael.hsb(req.queue / this.unit_count, req.offset / this.size / 1.5 + 0.1666, 1);
         circle.attr({"fill": color});
 
         req.r_obj = this.raphael.set();
@@ -525,7 +361,7 @@ class Animation {
     draw_tracks(x) {
         // draw req_set -> queues tracks
         this.track_conn_pt_x = x + from_main_q_tracks_w * 0.7;
-        this.raphael.mline(x, this.vcenter, this.track_conn_pt_x, this.vcenter).attr({"stroke-width": bus_stroke_with});
+        this.raphael.mline(x, this.vcenter, this.track_conn_pt_x, this.vcenter);
         this.raphael.mline(this.track_conn_pt_x, this.storages_v_centers[0],
             this.track_conn_pt_x, last(this.storages_v_centers));
 
@@ -540,7 +376,7 @@ class Animation {
     draw_queues(x) {
         for (const idx in this.storages_v_centers) {
             const y = this.storages_v_centers[idx];
-            const color = Raphael.hsb(idx / this.qcount, 0.2, 1);
+            const color = Raphael.hsb(idx / this.unit_count, 0.2, 1);
 
             let q = this.raphael.rect(x, y - this.cell_size / 2, this.cell_size * q_cells, this.cell_size);
             q.attr({"fill": color});
@@ -578,4 +414,120 @@ class Animation {
                                               cx_pos + tr_r * sin60, cy_pos - tr_r / 2);
         }
     }
+}
+
+
+
+function produce_req_loop(scene) {
+    if (!scene.paused && !scene.app_q_animation_in_progress) {
+        if (scene.total_active_reqs < scene.qd && scene.app_q_reqs.length < app_q_cells) {
+            let req = new IORequest(scene.cvalue, rand_int(scene.unit_count), rand_int(scene.size));
+            scene.draw_req(req,
+                scene.new_reqs_x + (app_q_cells - scene.app_q_reqs.length - 0.5) * scene.cell_size,
+                scene.vcenter);
+            scene.app_q_reqs.push(req);
+            scene.cvalue += rand_int(5);
+            scene.total_active_reqs++;
+        }
+    }
+}
+
+
+function move_input_requests_loop(scene) {
+    if (!scene.paused && !!scene.app_q_reqs.length) {
+        // move first request over the bus
+        const req = scene.app_q_reqs[0];
+        scene.app_q_reqs.shift();
+
+        const pts = [scene.track_start_x, scene.vcenter,
+            scene.track_conn_pt_x, scene.vcenter,
+            scene.track_conn_pt_x, scene.storages_v_centers[req.queue],
+            scene.track_ends_x, scene.storages_v_centers[req.queue]];
+
+        animate_on_points(req, pts, move_speed, () => {
+            const exec = scene.storage.execs[req.queue];
+            exec.send(req);
+            scene.update_q_req_pos(exec);
+        });
+
+        // shift other requests in queue
+        if (!!scene.app_q_reqs.length) {
+            for (const rr of scene.app_q_reqs.slice(0, -1)) {
+                const [x, y] = rr.get_xy();
+                rr.move(x + scene.cell_size, y, request_shift_time);
+                scene.app_q_animation_in_progress = true;
+            }
+            let rr = last(scene.app_q_reqs);
+            const [x, y] = rr.get_xy();
+            rr.move(x + scene.cell_size, y, request_shift_time, () => {scene.app_q_animation_in_progress = false});
+        }
+    }
+}
+
+function process_requests_loop(scene, exec) {
+    let request_in_flight = false;
+    let head_move_left = null;
+    const head_step_max = 10;
+
+    function cl() {
+        if (scene.paused) {
+            setTimeout(cl, process_loop_tout);
+            return;
+        }
+        if (head_move_left !== null) {
+            let mv = Math.sign(head_move_left) * Math.min(head_step_max, Math.abs(head_move_left));
+            exec.r_head.translate(mv, 0);
+            head_move_left -= mv;
+            if (Math.abs(head_move_left) < 1E-5) {
+                head_move_left = null;
+            } else {
+                setTimeout(cl, process_loop_tout_hmove);
+                return;
+            }
+        }
+        if (!request_in_flight) {
+            let old_head_pos = exec.position;
+            let req = exec.tick();
+
+            if (exec.position !== old_head_pos) {
+                head_move_left = (exec.position - old_head_pos) * scene.cell_size;
+                setTimeout(cl, process_loop_tout_hmove);
+                return;
+            }
+
+            // requests executed
+            if (!!req) {
+                // move request to head, then update storage value in cell
+                const [x, y] = req.get_xy();
+                req.r_obj.attr({"opacity": 1.0});
+                animate_on_points(req, [
+                    x, y - scene.cell_size,
+                    scene.storage_start_x + exec.position * scene.cell_size - scene.cell_size / 2, y - scene.cell_size
+                ], move_speed2, () => {
+                    req.r_obj.remove();
+                    scene.sync_sqstorage_vals(exec);
+                    request_in_flight = false;
+                    exec.r_texts[req.offset].attr({"fill": "#F66", "font-size": fs_normal_plus});
+                    exec.r_texts[req.offset].animate({"fill": "#000", "font-size": fs_normal}, text_color_tout);
+                });
+                request_in_flight = true;
+                // move all other requests in the queue
+                let xpos = scene.queues_start_x + scene.cell_size / 2;
+                for (const req of exec.all_req()) {
+                    let [cx, cy] = req.get_xy();
+                    if (cx !== xpos)
+                        req.move(xpos, cy, request_shift_time);
+                    xpos += scene.cell_size;
+                }
+                scene.total_active_reqs--;
+                scene.on_req_done(req);
+            } else {
+                scene.on_req_done(null);
+            }
+            setTimeout(cl, process_loop_tout);
+        } else {
+            setTimeout(cl, process_loop_tout_short);
+        }
+    }
+    cl();
 }
