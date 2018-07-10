@@ -209,6 +209,15 @@ time: 00:45:32.977054, event: done
 ```
 
 ---
+Slow requests - long scrubbing
+=============
+
+* Read /var/log/ceph.log - calculate deep scrub time
+* Check PG size
+* Run 'ceph health detail' and 'ceph pg dump | grep scrub' to find whenever
+  same OSD, where scrubbing run now causing slow requests 
+
+---
 Not enought space
 =================
 
