@@ -467,7 +467,6 @@ function move_input_requests_loop(scene) {
 function process_requests_loop(scene, exec) {
     let request_in_flight = false;
     let head_move_left = null;
-    const head_step_max = 10;
 
     function cl() {
         if (scene.paused) {
